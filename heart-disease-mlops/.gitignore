@@ -1,0 +1,38 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Data
+*.csv
+
+# Model
+*.joblib
+
+# Docker
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+# Python extra basura
+*.py[cod]
+*$py.class
+
+# Jupyter runtime / kernels raros
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+
+.venv/
+__pycache__/
+.ipynb_checkpoints/
