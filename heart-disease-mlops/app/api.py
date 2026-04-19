@@ -3,7 +3,7 @@ from pydantic import BaseModel
 import joblib
 import numpy as np
 
-model = joblib.load("../model.joblib")
+model = joblib.load("app/model.joblib")
 app = FastAPI()
 
 class Input(BaseModel):
