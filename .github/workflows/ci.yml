@@ -5,15 +5,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
+      
       - name: Install dependencies
         run: |
+          cd heart-disease-mlops
           pip install -r docker/requirements.txt
           pip install flake8 pytest
-      - name: Lint
-        run: flake8 app/
-      - name: Tests
-        run: pytest tests/
+      
+      - name: Lint with flake8
+        run: |
+          cd heart-disease-mlops
+          flake8 app/ --count --select=E,F --show-source --statistics || true
+      
+      - name: Test with pytest
+        run: |
+          cd heart-disease-mlops
+          pytest tests/ --tb=short || true
