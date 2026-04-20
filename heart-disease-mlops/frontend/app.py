@@ -147,7 +147,7 @@ footer { display: none !important; }
 
 
 # ─────────────────────────────────────────────
-#  LÓGICA DE PREDICCIÓN (CON REINTENTOS)
+#  LÓGICA DE PREDICCIÓN (REINTENTOS PACIENTES)
 # ─────────────────────────────────────────────
 def predict(age, sex, chest_pain_type, resting_bp, cholesterol,
             fasting_bs, resting_ecg, max_hr, exercise_angina,
@@ -166,47 +166,29 @@ def predict(age, sex, chest_pain_type, resting_bp, cholesterol,
         oldpeak, slope_map[st_slope],
     ]
 
-    # Configuración de reintentos
+    # Configuración PACIENTE para cold starts
     MAX_RETRIES = 3
-    RETRY_DELAYS = [5, 10, 15]  # segundos de espera entre intentos
+    RETRY_DELAYS = [30, 30]  # Esperas largas entre intentos
+    TIMEOUTS = [60, 90, 120] # Timeouts crecientes
 
-    # Mostrar estado de espera inicial
-    waiting_html = """
-    <div class="waiting-card" style="border-color: currentColor;">
-        <div class="wlabel">Procesando</div>
-        <div class="wtitle" id="waiting-title">Conectando con el servidor…</div>
-        <div class="wbar-bg" style="background: currentColor;">
-            <div class="wbar-fill" style="background: currentColor;"></div>
-        </div>
-        <p class="wnote" id="waiting-note">
-            Si el servidor estuvo inactivo, puede tardar hasta 45 segundos en responder.
-            Por favor espera, no recargues la página.
-        </p>
-    </div>
-    """
+    progress(0.05, desc="Preparando solicitud...")
 
-    # Función para actualizar el mensaje de espera (usando progress de Gradio)
-    def update_waiting(attempt):
-        progress(0.1 + (attempt * 0.1), desc=f"Intento {attempt + 1}/{MAX_RETRIES + 1} - Despertando servidor...")
-
-    progress(0.1, desc="Verificando conexión...")
-    time.sleep(0.5)
-
-    last_error = None
-
-    for attempt in range(MAX_RETRIES + 1):
+    for attempt in range(MAX_RETRIES):
+        timeout = TIMEOUTS[attempt]
+        
+        # Mensaje de estado según el intento
+        if attempt == 0:
+            progress(0.1, desc=f"Conectando con el servidor (timeout: {timeout}s)...")
+        else:
+            progress(0.2 + (attempt * 0.1), desc=f"Reintento {attempt + 1}/{MAX_RETRIES} - Esperando despertar del servidor...")
+        
         try:
-            update_waiting(attempt)
-            
-            # Timeout progresivo: más tiempo en cada intento
-            timeout = 60 if attempt == 0 else 90
-            
             t0 = time.time()
             response = requests.post(
                 API_URL,
                 json={"features": features},
                 timeout=timeout,
-                headers={"Connection": "close"}  # Evitar keep-alive que puede causar problemas
+                headers={"Connection": "close"}
             )
             response.raise_for_status()
             elapsed = time.time() - t0
@@ -252,13 +234,11 @@ def predict(age, sex, chest_pain_type, resting_bp, cholesterol,
                 </div>"""
 
         except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
-            last_error = e
-            if attempt < MAX_RETRIES:
+            if attempt < MAX_RETRIES - 1:
                 delay = RETRY_DELAYS[attempt]
-                progress(0.2 + (attempt * 0.15), desc=f"Servidor no disponible. Reintentando en {delay}s...")
+                progress(0.3 + (attempt * 0.2), desc=f"Servidor ocupado. Esperando {delay}s antes de reintentar...")
                 time.sleep(delay)
             else:
-                # Último intento fallido
                 progress(1.0, desc="Error de conexión")
                 return """
                 <div class="result-card" style="background:rgba(220,38,38,0.07);border-color:rgba(220,38,38,0.25);">
@@ -271,11 +251,9 @@ def predict(age, sex, chest_pain_type, resting_bp, cholesterol,
                 </div>"""
 
         except requests.exceptions.HTTPError as e:
-            # Error HTTP (ej. 502 Bad Gateway durante el arranque)
-            last_error = e
-            if attempt < MAX_RETRIES and response.status_code in [502, 503, 504]:
+            if attempt < MAX_RETRIES - 1 and response.status_code in [502, 503, 504]:
                 delay = RETRY_DELAYS[attempt]
-                progress(0.2 + (attempt * 0.15), desc=f"Servidor arrancando (HTTP {response.status_code}). Reintentando en {delay}s...")
+                progress(0.3 + (attempt * 0.2), desc=f"Servidor arrancando (HTTP {response.status_code}). Esperando {delay}s...")
                 time.sleep(delay)
             else:
                 progress(1.0, desc="Error del servidor")
@@ -297,7 +275,7 @@ def predict(age, sex, chest_pain_type, resting_bp, cholesterol,
                 <p class="note" style="font-family:monospace;">{str(e)}</p>
             </div>"""
 
-    # Si salimos del bucle sin retornar (no debería ocurrir)
+    # Si salimos del bucle sin retornar
     return """
     <div class="result-card" style="background:rgba(220,38,38,0.07);border-color:rgba(220,38,38,0.25);">
         <div class="label" style="color:#dc2626;">Error desconocido</div>
@@ -305,6 +283,7 @@ def predict(age, sex, chest_pain_type, resting_bp, cholesterol,
         <p class="note">Por favor, recarga la página e inténtalo de nuevo.</p>
     </div>"""
     
+       
 # ─────────────────────────────────────────────
 #  INTERFAZ
 # ─────────────────────────────────────────────
