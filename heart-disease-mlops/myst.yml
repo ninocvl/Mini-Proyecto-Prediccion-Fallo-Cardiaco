@@ -1,7 +1,6 @@
 version: 1
 project:
   id: 30bad2fb-2cfe-4585-a7d5-11580f1c18d3
-  title: Heart Disease MLOps
   github: https://github.com/ninocvl/Mini-Proyecto-Prediccion-Fallo-Cardiaco
   toc:
     - file: notebooks/0_analisis_exploratorio
