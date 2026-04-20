@@ -1,15 +1,10 @@
-# See docs at: https://mystmd.org/guide/frontmatter
 version: 1
 project:
   id: 30bad2fb-2cfe-4585-a7d5-11580f1c18d3
-  # title:
-  # description:
-  # keywords: []
-  # authors: []
   github: https://github.com/ninocvl/Mini-Proyecto-Prediccion-Fallo-Cardiaco
-  # To autogenerate a Table of Contents, run "jupyter book init --write-toc"
+  toc:
+    - file: notebooks/0_analisis_exploratorio
+    - file: notebooks/1_model_leakage_demo
+    - file: notebooks/2_model_pipeline_cv
 site:
   template: book-theme
-  # options:
-  #   favicon: favicon.ico
-  #   logo: site_logo.png
