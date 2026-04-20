@@ -153,40 +153,34 @@ footer { display: none !important; }
 def predict(age, sex, chest_pain_type, resting_bp, cholesterol,
             fasting_bs, resting_ecg, max_hr, exercise_angina,
             oldpeak, st_slope, progress=gr.Progress()):
-
-    sex_map        = {"Masculino": 1, "Femenino": 0}
+        # Mapeo de valores
+    sex_map = {"Masculino": 1, "Femenino": 0}
     chest_pain_map = {"ASY (Asintomático)": 3, "NAP": 2, "ATA": 1, "TA": 4}
-    ecg_map        = {"Normal": 0, "ST": 1, "LVH": 2}
-    angina_map     = {"No": 0, "Sí": 1}
-    slope_map      = {"Up": 1, "Flat": 2, "Down": 3}
-
+    ecg_map = {"Normal": 0, "ST": 1, "LVH": 2}
+    angina_map = {"No": 0, "Sí": 1}
+    slope_map = {"Up": 1, "Flat": 2, "Down": 3}
+    
     features = [
-        age, sex_map[sex], chest_pain_map[chest_pain_type],
-        resting_bp, cholesterol, fasting_bs,
-        ecg_map[resting_ecg], max_hr, angina_map[exercise_angina],
-        oldpeak, slope_map[st_slope],
+        age, sex_map[sex], chest_pain_map[chest_pain_type], resting_bp, cholesterol,
+        fasting_bs, ecg_map[resting_ecg], max_hr, angina_map[exercise_angina], oldpeak, slope_map[st_slope]
     ]
 
     progress(0.1, desc="Verificando conexión con el servidor...")
 
     try:
-        progress(0.3, desc="Despertando el servidor (esto puede tomar hasta 2 minutos)...")
-        response = requests.post(
-            API_URL,
-            json={"features": features},
-            timeout=120
-        )
-
+        progress(0.3, desc="Despertando el servidor (esto puede tomar hasta 60 segundos)...")
+        response = requests.post(API_URL, json={"features": features}, timeout=90)
+        
         progress(0.8, desc="Servidor despierto. Procesando predicción...")
         response.raise_for_status()
         result = response.json()
-        prob = result["heart_disease_probability"]
-        prediction = result["prediction"]
-
+        prob = result['heart_disease_probability']
+        prediction = result['prediction']
+        
         progress(1.0, desc="¡Predicción completada!")
-
+        
         if prediction == 1:
-            return f"""
+           return f"""
             <div class="result-card" style="
                 background: rgba(220,38,38,0.07);
                 border-color: rgba(220,38,38,0.25);
@@ -202,7 +196,7 @@ def predict(age, sex, chest_pain_type, resting_bp, cholesterol,
                 </p>
             </div>"""
         else:
-            return f"""
+           return f"""
             <div class="result-card" style="
                 background: rgba(22,163,74,0.07);
                 border-color: rgba(22,163,74,0.25);
@@ -217,7 +211,7 @@ def predict(age, sex, chest_pain_type, resting_bp, cholesterol,
                     Continúe con controles periódicos de rutina.
                 </p>
             </div>"""
-
+        
     except requests.exceptions.Timeout:
         return """
         <div class="result-card" style="background:rgba(234,179,8,0.07);border-color:rgba(234,179,8,0.25);">
