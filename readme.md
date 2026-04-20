@@ -7,13 +7,13 @@
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5.svg?logo=kubernetes&logoColor=white)](https://kubernetes.io/)
 [![Render](https://img.shields.io/badge/Render-Deployed-46E3B7.svg)](https://render.com)
 
-## 📋 Descripción del Proyecto
+## Descripción del Proyecto
 
 Este proyecto implementa un flujo completo de **MLOps** para la predicción de riesgo de fallo cardíaco. Utilizando el dataset **Heart Failure Prediction** de Kaggle, se ha desarrollado, entrenado y desplegado un modelo de clasificación binaria (Random Forest) siguiendo las mejores prácticas de la industria.
 
 El proyecto abarca desde el análisis exploratorio de datos (EDA) y el entrenamiento seguro con Pipelines de Scikit-learn, hasta el despliegue en producción con **FastAPI**, **Docker**, **Kubernetes**, **CI/CD con GitHub Actions** y **monitoreo de deriva de datos con Evidently**.
 
-### 🌐 Demo en Vivo
+###  Demo en Vivo
 
 | Componente | URL | Descripción |
 |:---|:---|:---|
@@ -21,5 +21,5 @@ El proyecto abarca desde el análisis exploratorio de datos (EDA) y el entrenami
 | **API (FastAPI)** | [heart-api-y63c.onrender.com/docs](https://heart-api-y63c.onrender.com/docs) | Documentación Swagger de la API REST |
 | **API Endpoint** | [heart-api-y63c.onrender.com/predict](https://heart-api-y63c.onrender.com/predict) | Endpoint POST para predicciones |
 
-> ⏳ **Nota sobre el plan gratuito de Render:** La primera predicción puede tardar entre 30 y 60 segundos debido al "cold start". Las siguientes son instantáneas.
+>  **Nota sobre el plan gratuito de Render:** La primera predicción puede tardar entre 30 y 60 segundos debido al "cold start". Las siguientes son instantáneas.
 
