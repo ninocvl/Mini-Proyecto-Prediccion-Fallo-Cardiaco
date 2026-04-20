@@ -147,11 +147,11 @@ footer { display: none !important; }
 
 
 # ─────────────────────────────────────────────
-#  LÓGICA DE PREDICCIÓN
+#  LÓGICA DE PREDICCIÓN (REINTENTOS PACIENTES)
 # ─────────────────────────────────────────────
 def predict(age, sex, chest_pain_type, resting_bp, cholesterol,
             fasting_bs, resting_ecg, max_hr, exercise_angina,
-            oldpeak, st_slope):
+            oldpeak, st_slope, progress=gr.Progress()):
 
     sex_map        = {"Masculino": 1, "Femenino": 0}
     chest_pain_map = {"ASY (Asintomático)": 3, "NAP": 2, "ATA": 1, "TA": 4}
@@ -166,97 +166,124 @@ def predict(age, sex, chest_pain_type, resting_bp, cholesterol,
         oldpeak, slope_map[st_slope],
     ]
 
-    # Mostrar estado de espera inmediatamente
-    waiting_html = """
-    <div class="waiting-card" style="border-color: currentColor;">
-        <div class="wlabel">Procesando</div>
-        <div class="wtitle">Conectando con el servidor…</div>
-        <div class="wbar-bg" style="background: currentColor;">
-            <div class="wbar-fill" style="background: currentColor;"></div>
-        </div>
-        <p class="wnote">
-            Si el servidor estuvo inactivo, puede tardar hasta 45 segundos en responder.
-            Por favor espera, no recargues la página.
-        </p>
-    </div>
-    """
+    # Configuración PACIENTE para cold starts
+    MAX_RETRIES = 3
+    RETRY_DELAYS = [30, 30]  # Esperas largas entre intentos
+    TIMEOUTS = [60, 90, 120] # Timeouts crecientes
 
-    try:
-        t0 = time.time()
-        response = requests.post(API_URL, json={"features": features}, timeout=90)
-        response.raise_for_status()
-        elapsed = time.time() - t0
+    progress(0.05, desc="Preparando solicitud...")
 
-        result     = response.json()
-        prob       = result["heart_disease_probability"]
-        prediction = result["prediction"]
-
-        cold = f" (el servidor tardó {elapsed:.0f}s en arrancar)" if elapsed > 10 else ""
-
-        if prediction == 1:
-            return f"""
-            <div class="result-card" style="
-                background: rgba(220,38,38,0.07);
-                border-color: rgba(220,38,38,0.25);
-            ">
-                <div class="label" style="color:#dc2626;">Resultado del análisis{cold}</div>
-                <div class="title" style="color:#991b1b;">Alto riesgo de enfermedad cardíaca</div>
-                <div class="pill" style="background:rgba(220,38,38,0.12);color:#991b1b;">
-                    Probabilidad: {prob:.1%}
-                </div>
-                <p class="note">
-                    Se recomienda consultar con un especialista en cardiología
-                    para una evaluación clínica completa.
-                </p>
-            </div>"""
+    for attempt in range(MAX_RETRIES):
+        timeout = TIMEOUTS[attempt]
+        
+        # Mensaje de estado según el intento
+        if attempt == 0:
+            progress(0.1, desc=f"Conectando con el servidor (timeout: {timeout}s)...")
         else:
+            progress(0.2 + (attempt * 0.1), desc=f"Reintento {attempt + 1}/{MAX_RETRIES} - Esperando despertar del servidor...")
+        
+        try:
+            t0 = time.time()
+            response = requests.post(
+                API_URL,
+                json={"features": features},
+                timeout=timeout,
+                headers={"Connection": "close"}
+            )
+            response.raise_for_status()
+            elapsed = time.time() - t0
+
+            result = response.json()
+            prob = result["heart_disease_probability"]
+            prediction = result["prediction"]
+
+            progress(0.9, desc="Procesando resultado...")
+            cold = f" (el servidor tardó {elapsed:.0f}s en arrancar)" if elapsed > 10 else ""
+
+            if prediction == 1:
+                return f"""
+                <div class="result-card" style="
+                    background: rgba(220,38,38,0.07);
+                    border-color: rgba(220,38,38,0.25);
+                ">
+                    <div class="label" style="color:#dc2626;">Resultado del análisis{cold}</div>
+                    <div class="title" style="color:#991b1b;">Alto riesgo de enfermedad cardíaca</div>
+                    <div class="pill" style="background:rgba(220,38,38,0.12);color:#991b1b;">
+                        Probabilidad: {prob:.1%}
+                    </div>
+                    <p class="note">
+                        Se recomienda consultar con un especialista en cardiología
+                        para una evaluación clínica completa.
+                    </p>
+                </div>"""
+            else:
+                return f"""
+                <div class="result-card" style="
+                    background: rgba(22,163,74,0.07);
+                    border-color: rgba(22,163,74,0.25);
+                ">
+                    <div class="label" style="color:#16a34a;">Resultado del análisis{cold}</div>
+                    <div class="title" style="color:#166534;">Bajo riesgo de enfermedad cardíaca</div>
+                    <div class="pill" style="background:rgba(22,163,74,0.12);color:#166534;">
+                        Probabilidad: {prob:.1%}
+                    </div>
+                    <p class="note">
+                        Los indicadores analizados no sugieren riesgo elevado.
+                        Continúe con controles periódicos de rutina.
+                    </p>
+                </div>"""
+
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+            if attempt < MAX_RETRIES - 1:
+                delay = RETRY_DELAYS[attempt]
+                progress(0.3 + (attempt * 0.2), desc=f"Servidor ocupado. Esperando {delay}s antes de reintentar...")
+                time.sleep(delay)
+            else:
+                progress(1.0, desc="Error de conexión")
+                return """
+                <div class="result-card" style="background:rgba(220,38,38,0.07);border-color:rgba(220,38,38,0.25);">
+                    <div class="label" style="color:#dc2626;">Error de conexión</div>
+                    <div class="title" style="color:#991b1b;">No se pudo conectar tras varios intentos</div>
+                    <p class="note">
+                        El servidor está tardando más de lo habitual en despertar.
+                        Por favor, espera 1-2 minutos y vuelve a intentarlo.
+                    </p>
+                </div>"""
+
+        except requests.exceptions.HTTPError as e:
+            if attempt < MAX_RETRIES - 1 and response.status_code in [502, 503, 504]:
+                delay = RETRY_DELAYS[attempt]
+                progress(0.3 + (attempt * 0.2), desc=f"Servidor arrancando (HTTP {response.status_code}). Esperando {delay}s...")
+                time.sleep(delay)
+            else:
+                progress(1.0, desc="Error del servidor")
+                return f"""
+                <div class="result-card" style="background:rgba(220,38,38,0.07);border-color:rgba(220,38,38,0.25);">
+                    <div class="label" style="color:#dc2626;">Error del servidor</div>
+                    <div class="title" style="color:#991b1b;">HTTP {response.status_code}</div>
+                    <p class="note">
+                        El servidor respondió con un error. Intenta de nuevo en unos segundos.
+                    </p>
+                </div>"""
+
+        except Exception as e:
+            progress(1.0, desc="Error inesperado")
             return f"""
-            <div class="result-card" style="
-                background: rgba(22,163,74,0.07);
-                border-color: rgba(22,163,74,0.25);
-            ">
-                <div class="label" style="color:#16a34a;">Resultado del análisis{cold}</div>
-                <div class="title" style="color:#166534;">Bajo riesgo de enfermedad cardíaca</div>
-                <div class="pill" style="background:rgba(22,163,74,0.12);color:#166534;">
-                    Probabilidad: {prob:.1%}
-                </div>
-                <p class="note">
-                    Los indicadores analizados no sugieren riesgo elevado.
-                    Continúe con controles periódicos de rutina.
-                </p>
+            <div class="result-card" style="background:rgba(220,38,38,0.07);border-color:rgba(220,38,38,0.25);">
+                <div class="label" style="color:#dc2626;">Error inesperado</div>
+                <div class="title" style="color:#991b1b;">Algo salió mal</div>
+                <p class="note" style="font-family:monospace;">{str(e)}</p>
             </div>"""
 
-    except requests.exceptions.Timeout:
-        return """
-        <div class="result-card" style="background:rgba(217,119,6,0.07);border-color:rgba(217,119,6,0.3);">
-            <div class="label" style="color:#d97706;">Tiempo agotado</div>
-            <div class="title" style="color:#92400e;">El servidor no respondió a tiempo</div>
-            <p class="note">
-                El servidor tardó más de 90 segundos. Esto es inusual.
-                Espera unos segundos e intenta de nuevo.
-            </p>
-        </div>"""
-
-    except requests.exceptions.ConnectionError:
-        return """
-        <div class="result-card" style="background:rgba(220,38,38,0.07);border-color:rgba(220,38,38,0.25);">
-            <div class="label" style="color:#dc2626;">Error de conexión</div>
-            <div class="title" style="color:#991b1b;">No se pudo conectar</div>
-            <p class="note">
-                Verifica tu conexión a internet o espera 1-2 minutos
-                para que el servidor termine de arrancar.
-            </p>
-        </div>"""
-
-    except Exception as e:
-        return f"""
-        <div class="result-card" style="background:rgba(220,38,38,0.07);border-color:rgba(220,38,38,0.25);">
-            <div class="label" style="color:#dc2626;">Error inesperado</div>
-            <div class="title" style="color:#991b1b;">Algo salió mal</div>
-            <p class="note" style="font-family:monospace;">{str(e)}</p>
-        </div>"""
-
-
+    # Si salimos del bucle sin retornar
+    return """
+    <div class="result-card" style="background:rgba(220,38,38,0.07);border-color:rgba(220,38,38,0.25);">
+        <div class="label" style="color:#dc2626;">Error desconocido</div>
+        <div class="title" style="color:#991b1b;">No se pudo completar la predicción</div>
+        <p class="note">Por favor, recarga la página e inténtalo de nuevo.</p>
+    </div>"""
+    
+       
 # ─────────────────────────────────────────────
 #  INTERFAZ
 # ─────────────────────────────────────────────
